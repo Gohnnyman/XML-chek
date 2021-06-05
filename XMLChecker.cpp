@@ -12,27 +12,19 @@
 
 QString XMLChecker::line;
 
-class SyntaxError
+
+SyntaxError::SyntaxError(QString message, qsizetype line, qsizetype column)
 {
-    /*
-    * SyntaxError class in XMLChecker class
-    * represent exception for syntax errors in file
-    * */
-public:
-    QString message;
+    if(line && column) this->message = QString("Error observed at line %1:%2\n").arg(line).arg(column); else
+    if(line) this->message = QString("Error observed at line %1\n").arg(line);
+    this->message += message;
+}
 
-    SyntaxError(QString message, qsizetype line = 0, qsizetype column = 0)
-    {
-        if(line && column) this->message = QString("Error observed at line %1:%2\n").arg(line).arg(column); else
-        if(line) this->message = QString("Error observed at line %1\n").arg(line);
-        this->message += message;
-    }
+QString SyntaxError::what() const
+{
+    return message;
+}
 
-    QString what() const
-    {
-        return message;
-    }
-};
 
 
 void XMLChecker::check(QFile& file)
@@ -60,21 +52,34 @@ void XMLChecker::check(QFile& file)
 
 void XMLChecker::read_and_validate(QFile& file)
 {
+    /*
+     * Method opens xml file and reads lines from it with QXmlStreamReader
+     * and checks for errors;
+     * */
+
     if(!file.open(QIODeviceBase::ReadOnly | QIODeviceBase::Text))
         throw SyntaxError(file.errorString());
 
     QXmlStreamReader xml(&file);
 
-    if(!xml.documentEncoding().isEmpty() || !xml.documentVersion().isEmpty())
-        throw SyntaxError("Prolog isn't allowed");
-
     while (!xml.atEnd() && !xml.hasError())
     {
         xml.readNext();
-        if(xml.attributes().hasAttribute("xmlns"))
+
+        // Checking for prolog
+        if(xml.isStartDocument())
+            if(!xml.documentEncoding().isEmpty() || !xml.documentVersion().isEmpty())
+                throw SyntaxError("Prolog isn't allowed");
+
+        // Checking for namespaces
+        if(!xml.namespaceUri().isEmpty())
             throw SyntaxError("Namespaces aren't allowed", xml.lineNumber(), xml.columnNumber()); else
+
+        // Checking for namespaces
         if(!xml.prefix().isEmpty())
             throw SyntaxError("Prefixes aren't allowed.", xml.lineNumber(), xml.columnNumber()); else
+
+        // Checking for namespaces
         if(xml.hasError())
             throw SyntaxError(xml.errorString(), xml.lineNumber(), xml.columnNumber());
     }

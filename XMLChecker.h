@@ -8,13 +8,22 @@
 #include <QFile>
 
 
-class SyntaxError;
+class SyntaxError
+{
+    /*
+    * SyntaxError class
+    * represent exception for syntax errors in file
+    * */
+private:
+    QString message;
+public:
+    SyntaxError(QString message, qsizetype line = 0, qsizetype column = 0);
+    QString what() const;
+};
 
 class XMLChecker
 {
 public:
-
-    explicit XMLChecker() = default;
     static void check(QFile& file);
 
 private:
