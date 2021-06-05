@@ -6,10 +6,9 @@
 
 #include "mainwindow.h"
 #include "ui_MainWindow.h"
+#include "XMLChecker.h"
 #include <QMessageBox>
 #include <QFileDialog>
-
-#include <iostream>
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -20,11 +19,16 @@ MainWindow::MainWindow(QWidget *parent) :
 [[maybe_unused]]
 void MainWindow::on_pushButton_clicked()
 {
+
+    QDir dir;
+    dir.cdUp();
+    dir.cd("test");
+    QString path = dir.absolutePath();
+
     QString file_path = QFileDialog::getOpenFileName(this,"Select XML/txt file",
-    QDir::currentPath(), "XML files (*.xml);;Text files (*.txt)");
+        path, "XML files (*.xml);;Text files (*.txt)");
     QFile file(file_path);
-
-
+    XMLChecker::check(file);
 
 }
 
