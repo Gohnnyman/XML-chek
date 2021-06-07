@@ -6,6 +6,7 @@
 #define XML_CHEK_XMLCHECKER_H
 
 #include <QFile>
+#include <QTextStream>
 
 
 class SyntaxError
@@ -27,7 +28,14 @@ public:
     static void check(QFile& file);
 
 private:
-    static QString line;
+    static void ltsign();
+    static void nextline();
+    static void attribute();
+    static QString findnext(qsizetype maxlen = 1);
+    static qsizetype line;
+    static qsizetype column;
+    static QList<QString> taglist;
+    static QTextStream stream;
     static void read_and_validate(QFile& file);
 };
 
