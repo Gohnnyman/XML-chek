@@ -36,6 +36,7 @@ private:
     static void attributes_value();
     static void comment();
     static bool iscomment;
+    static bool need_attribute;
     static QString findnext(qsizetype maxlen = 1);
     static qsizetype line;
     static qsizetype column;

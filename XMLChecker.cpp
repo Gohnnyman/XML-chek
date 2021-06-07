@@ -6,7 +6,6 @@
 #include <QMessageBox>
 #include <QDebug>
 #include <QRegularExpression>
-#include <QXmlStreamReader>
 #include <QException>
 
 
@@ -15,7 +14,7 @@ QList<QString> XMLChecker::taglist;
 qsizetype XMLChecker::line = 1;
 qsizetype XMLChecker::column = 0;
 bool XMLChecker::iscomment = false;
-
+bool XMLChecker::need_attribute = true;
 
 void XMLChecker::zeroing()
 {
@@ -23,6 +22,7 @@ void XMLChecker::zeroing()
     line = 1;
     column = 0;
     iscomment = false;
+    need_attribute = true;
 }
 
 
@@ -82,37 +82,10 @@ void XMLChecker::read_and_validate(QFile& file)
     while (!stream.atEnd())
     {
         ch = findnext();
-        if(iscomment) comment();
+        if(iscomment) comment(); else
         if(ch == "<") ltsign(); else
         if(ch == ">") throw SyntaxError(" '>' can't be before '<'", line, column);
     }
-
-//    if(!file.open(QIODeviceBase::ReadOnly | QIODeviceBase::Text))
-//        throw SyntaxError(file.errorString());
-//
-//    QXmlStreamReader xml(&file);
-//
-//    while (!xml.atEnd() && !xml.hasError())
-//    {
-//        xml.readNext();
-//
-//        // Checking for prolog
-//        if(xml.isStartDocument())
-//            if(!xml.documentEncoding().isEmpty() || !xml.documentVersion().isEmpty())
-//                throw SyntaxError("Prolog isn't allowed");
-//
-//        // Checking for namespaces
-//        if(!xml.namespaceUri().isEmpty())
-//            throw SyntaxError("Namespaces aren't allowed", xml.lineNumber(), xml.columnNumber()); else
-//
-//        // Checking for namespaces
-//        if(!xml.prefix().isEmpty())
-//            throw SyntaxError("Prefixes aren't allowed.", xml.lineNumber(), xml.columnNumber()); else
-//
-//        // Checking for namespaces
-//        if(xml.hasError())
-//            throw SyntaxError(xml.errorString(), xml.lineNumber(), xml.columnNumber());
-//    }
 }
 
 void XMLChecker::nextline()
@@ -133,15 +106,19 @@ void XMLChecker::tag_name()
     {
         ch = findnext();
         if(ch == ">" && tmp.isEmpty())
-            throw SyntaxError("Attribute name expected, but '>' found", line, column); else
-        if(ch == ">" || (ch == " " && !tmp.isEmpty()))
+            throw SyntaxError("Attribute name expected, but '>' found", line, column);
+        else if(ch == ":") throw SyntaxError("Prefixes aren't allowed", line, column);
+        else if(ch == ">" || (ch == " " && !tmp.isEmpty()))
         {
+            if(ch == ">") need_attribute = false;
             tmp = tmp.trimmed();
-            if(tmp == "?xml") throw SyntaxError("Prolog isn't allowed", line, column); else
-            if(tmp == "!--") { iscomment = true; return; } else
-            if(tmp[0] == '/') tag_close(tmp); else taglist.push_back(tmp);
+            if(tmp == "?xml") throw SyntaxError("Prolog isn't allowed", line, column);
+            else if(tmp == "!--") { iscomment = true; return; }
+            else if(tmp[0] == '/') tag_close(tmp);
+            else if(tmp.right(1) != "/") qDebug() << tmp << " ADDED", taglist.push_back(tmp);
             break;
-        } else tmp += ch;
+        }
+        else tmp += ch;
     }
 }
 
@@ -155,14 +132,21 @@ void XMLChecker::comment()
         ch = findnext();
         if(ch == tmp[i]) i++; else
             i = 0;
-        if(i == 3) return;
+        if(i == 3)
+        {
+            iscomment = false;
+            return;
+        }
     }
 }
 
 void XMLChecker::tag_close(const QString& tag)
 {
+//    qDebug() << taglist.back() << ' ' << tag.mid(1);
+    need_attribute = false;
     if(taglist.back() == tag.mid(1))
     {
+        qDebug() << taglist.back() << " REMOVED";
         taglist.pop_back();
     } else
         throw SyntaxError(QString("</%1> expected, but </%2> found").arg(taglist.back(), tag.mid(1)), line, column);
@@ -170,22 +154,37 @@ void XMLChecker::tag_close(const QString& tag)
 
 void XMLChecker::attributes()
 {
-    if(iscomment) return;
+    if(iscomment || !need_attribute)
+    {
+        need_attribute = true;
+        return;
+    }
     QString ch;
     QString tmp;
     while (!stream.atEnd())
     {
         ch = findnext();
         if((ch == ">" || ch == "<") && !tmp.isEmpty())
-            throw SyntaxError(QString("'=' expected, but '%1' found").arg(ch), line, column); else
-        if(ch == "=")
+            throw SyntaxError(QString("'=' expected, but '%1' found").arg(ch), line, column);
+        if(tmp.trimmed().contains("xmlns:")) throw SyntaxError("Namespaces aren't allowed", line, column);
+        else if(ch == "=")
         {
-            if(tmp.contains("xmlns:")) SyntaxError("Namespaces aren't allowed", line, column);
+            qDebug() << "ATTRIBUTE NAME: " << tmp;
             attributes_value();
-        } else
-        if(ch == ">") break;
+            tmp.clear();
+        }
+        else if(ch == "/")
+        {
+            ch = findnext();
+            qDebug() << taglist.back() << " REMOVED";
+            taglist.pop_back();
+            if(ch != ">") throw SyntaxError(QString("Expected '>' after '/', but '%1' found").arg(ch), line, column);
+            else break;
+        }
+        else if(ch == ">") break;
+        else tmp += ch;
     }
-    ch = stream.read(1);
+//    ch = stream.read(1);
 
 }
 
@@ -194,6 +193,7 @@ void XMLChecker::attributes_value()
     QString ch;
     QString tmp;
     ch = findnext();
+    while(ch == " ") ch = findnext();
     if(ch != "\"") throw SyntaxError(QString("'=' expected, but '%1' found").arg(ch), line, column);
 
     while(!stream.atEnd())
@@ -202,22 +202,6 @@ void XMLChecker::attributes_value()
         if(ch == ">" || ch == "<")
             throw SyntaxError(QString("'\"' expected, but '%1' found").arg(ch), line, column);
         if(ch == "\"") break;
-    }
-
-    ch = findnext();
-    if(ch != " ")
-    {
-        if(ch != '/') throw SyntaxError("Space expected after attribute's value", line, column); else
-        {
-            taglist.pop_back();
-            while(!stream.atEnd())
-            {
-                ch = findnext();
-                if(ch != " " && ch != ">")
-                    throw SyntaxError(QString("Expected '>' after '/' but '%1' found").arg(ch), line, column); else
-                if(ch != " " && ch == ">") break;
-            }
-        }
     }
 }
 
@@ -229,7 +213,7 @@ QString XMLChecker::findnext(qsizetype maxlen)
         nextline();
         ch = stream.read(maxlen);
     }
-    column++;
+    if(ch == '\t') column += 4; else column++;
     return ch;
 }
 
