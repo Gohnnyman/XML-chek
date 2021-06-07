@@ -24,6 +24,9 @@ public:
 
 class XMLChecker
 {
+    /*
+     * Class for checking Syntax Errors in file
+     * */
 public:
     static void check(QFile& file);
 
@@ -35,15 +38,16 @@ private:
     static void tag_close(const QString& tag);
     static void attributes_value();
     static void comment();
-    static bool iscomment;
-    static bool need_attribute;
+    static void zeroing();
+    static void read_and_validate(QFile& file);
     static QString findnext(qsizetype maxlen = 1);
     static qsizetype line;
     static qsizetype column;
     static QList<QString> taglist;
     static QTextStream stream;
-    static void zeroing();
-    static void read_and_validate(QFile& file);
+    static bool isroot;
+    static bool iscomment;
+    static bool need_attribute;
 };
 
 
