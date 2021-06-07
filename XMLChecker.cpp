@@ -36,7 +36,7 @@ SyntaxError::SyntaxError(QString message, qsizetype line, qsizetype column)
     this->message += message;
 }
 
-QString SyntaxError::what() const { return message };
+QString SyntaxError::what() const { return message; }
 
 void XMLChecker::check(QFile& file)
 {
@@ -232,7 +232,6 @@ void XMLChecker::attributes()
         else if(ch == "/")
         {
             ch = findnext();
-            qDebug() << taglist.back() << " REMOVED";
             taglist.pop_back();
             if(ch != ">") throw SyntaxError(QString("Expected '>' after '/', but '%1' found").arg(ch), line, column);
             else break;
